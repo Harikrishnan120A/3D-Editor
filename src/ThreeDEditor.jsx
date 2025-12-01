@@ -20,6 +20,71 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter';
+
+// Custom ParametricGeometry for Three.js r128
+function createParametricGeometry(func, slices, stacks) {
+  const vertices = [];
+  const normals = [];
+  const uvs = [];
+  const indices = [];
+  
+  const p0 = new THREE.Vector3();
+  const p1 = new THREE.Vector3();
+  const pu = new THREE.Vector3();
+  const pv = new THREE.Vector3();
+  const normal = new THREE.Vector3();
+  
+  const sliceCount = slices + 1;
+  
+  for (let i = 0; i <= stacks; i++) {
+    const v = i / stacks;
+    for (let j = 0; j <= slices; j++) {
+      const u = j / slices;
+      func(u, v, p0);
+      vertices.push(p0.x, p0.y, p0.z);
+      
+      // Calculate normal
+      const EPS = 0.00001;
+      if (u - EPS >= 0) {
+        func(u - EPS, v, p1);
+        pu.subVectors(p0, p1);
+      } else {
+        func(u + EPS, v, p1);
+        pu.subVectors(p1, p0);
+      }
+      if (v - EPS >= 0) {
+        func(u, v - EPS, p1);
+        pv.subVectors(p0, p1);
+      } else {
+        func(u, v + EPS, p1);
+        pv.subVectors(p1, p0);
+      }
+      normal.crossVectors(pu, pv).normalize();
+      normals.push(normal.x, normal.y, normal.z);
+      uvs.push(u, v);
+    }
+  }
+  
+  for (let i = 0; i < stacks; i++) {
+    for (let j = 0; j < slices; j++) {
+      const a = i * sliceCount + j;
+      const b = i * sliceCount + j + 1;
+      const c = (i + 1) * sliceCount + j + 1;
+      const d = (i + 1) * sliceCount + j;
+      indices.push(a, b, d);
+      indices.push(b, c, d);
+    }
+  }
+  
+  const geometry = new THREE.BufferGeometry();
+  geometry.setIndex(indices);
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  
+  return geometry;
+}
+
 import {
   Box,
   Circle,
@@ -511,6 +576,687 @@ const ThreeDEditor = () => {
       case 'hemisphere': {
         geometry = new THREE.SphereGeometry(0.5, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
         name = `Hemisphere_${objectCounter}`;
+        break;
+      }
+      case 'hexagonprism': {
+        geometry = new THREE.CylinderGeometry(0.5, 0.5, 1, 6);
+        name = `HexagonPrism_${objectCounter}`;
+        break;
+      }
+      case 'octagonprism': {
+        geometry = new THREE.CylinderGeometry(0.5, 0.5, 1, 8);
+        name = `OctagonPrism_${objectCounter}`;
+        break;
+      }
+      case 'diamond': {
+        // Diamond shape (two cones)
+        const diamondTop = new THREE.ConeGeometry(0.5, 0.7, 8);
+        const diamondBottom = new THREE.ConeGeometry(0.5, 0.3, 8);
+        diamondBottom.rotateX(Math.PI);
+        diamondBottom.translate(0, -0.3, 0);
+        diamondTop.translate(0, 0.15, 0);
+        geometry = diamondTop;
+        name = `Diamond_${objectCounter}`;
+        break;
+      }
+      case 'crystal': {
+        geometry = new THREE.OctahedronGeometry(0.5, 0);
+        name = `Crystal_${objectCounter}`;
+        break;
+      }
+      case 'egg': {
+        // Egg shape using lathe
+        const eggPoints = [];
+        for (let i = 0; i <= 20; i++) {
+          const t = i / 20;
+          const y = t * 1.2 - 0.6;
+          const r = Math.sin(t * Math.PI) * 0.4 * (1 - t * 0.3);
+          eggPoints.push(new THREE.Vector2(r, y));
+        }
+        geometry = new THREE.LatheGeometry(eggPoints, 32);
+        name = `Egg_${objectCounter}`;
+        break;
+      }
+      case 'vase': {
+        // Vase shape using lathe
+        const vasePoints = [
+          new THREE.Vector2(0.3, -0.5),
+          new THREE.Vector2(0.35, -0.3),
+          new THREE.Vector2(0.25, 0),
+          new THREE.Vector2(0.35, 0.3),
+          new THREE.Vector2(0.4, 0.4),
+          new THREE.Vector2(0.35, 0.5),
+          new THREE.Vector2(0.3, 0.5)
+        ];
+        geometry = new THREE.LatheGeometry(vasePoints, 32);
+        name = `Vase_${objectCounter}`;
+        break;
+      }
+      case 'bowl': {
+        // Bowl shape
+        const bowlPoints = [
+          new THREE.Vector2(0.1, -0.3),
+          new THREE.Vector2(0.3, -0.25),
+          new THREE.Vector2(0.45, -0.1),
+          new THREE.Vector2(0.5, 0.1),
+          new THREE.Vector2(0.45, 0.15)
+        ];
+        geometry = new THREE.LatheGeometry(bowlPoints, 32);
+        name = `Bowl_${objectCounter}`;
+        break;
+      }
+      case 'goblet': {
+        // Goblet/wine glass shape
+        const gobletPoints = [
+          new THREE.Vector2(0.25, -0.5),
+          new THREE.Vector2(0.25, -0.45),
+          new THREE.Vector2(0.05, -0.4),
+          new THREE.Vector2(0.05, 0),
+          new THREE.Vector2(0.15, 0.1),
+          new THREE.Vector2(0.3, 0.35),
+          new THREE.Vector2(0.35, 0.5),
+          new THREE.Vector2(0.3, 0.5)
+        ];
+        geometry = new THREE.LatheGeometry(gobletPoints, 32);
+        name = `Goblet_${objectCounter}`;
+        break;
+      }
+      case 'cross': {
+        // 3D Cross shape
+        const crossShape = new THREE.Shape();
+        crossShape.moveTo(-0.15, 0.5);
+        crossShape.lineTo(0.15, 0.5);
+        crossShape.lineTo(0.15, 0.15);
+        crossShape.lineTo(0.5, 0.15);
+        crossShape.lineTo(0.5, -0.15);
+        crossShape.lineTo(0.15, -0.15);
+        crossShape.lineTo(0.15, -0.5);
+        crossShape.lineTo(-0.15, -0.5);
+        crossShape.lineTo(-0.15, -0.15);
+        crossShape.lineTo(-0.5, -0.15);
+        crossShape.lineTo(-0.5, 0.15);
+        crossShape.lineTo(-0.15, 0.15);
+        crossShape.lineTo(-0.15, 0.5);
+        geometry = new THREE.ExtrudeGeometry(crossShape, { depth: 0.15, bevelEnabled: false });
+        name = `Cross_${objectCounter}`;
+        break;
+      }
+      case 'moon': {
+        // Crescent moon shape
+        const moonShape = new THREE.Shape();
+        moonShape.absarc(0, 0, 0.5, Math.PI / 2, -Math.PI / 2, false);
+        moonShape.absarc(0.2, 0, 0.35, -Math.PI / 2, Math.PI / 2, true);
+        geometry = new THREE.ExtrudeGeometry(moonShape, { depth: 0.2, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05 });
+        name = `Moon_${objectCounter}`;
+        break;
+      }
+      case 'lightning': {
+        // Lightning bolt shape
+        const lightningShape = new THREE.Shape();
+        lightningShape.moveTo(0, 0.5);
+        lightningShape.lineTo(0.15, 0.5);
+        lightningShape.lineTo(0.05, 0.1);
+        lightningShape.lineTo(0.2, 0.1);
+        lightningShape.lineTo(-0.1, -0.5);
+        lightningShape.lineTo(0, -0.1);
+        lightningShape.lineTo(-0.15, -0.1);
+        lightningShape.lineTo(0, 0.5);
+        geometry = new THREE.ExtrudeGeometry(lightningShape, { depth: 0.1, bevelEnabled: false });
+        name = `Lightning_${objectCounter}`;
+        break;
+      }
+      case 'mushroom': {
+        // Mushroom using lathe
+        const mushroomPoints = [
+          new THREE.Vector2(0.1, -0.5),
+          new THREE.Vector2(0.12, -0.2),
+          new THREE.Vector2(0.1, -0.15),
+          new THREE.Vector2(0.4, 0),
+          new THREE.Vector2(0.45, 0.15),
+          new THREE.Vector2(0.35, 0.25),
+          new THREE.Vector2(0, 0.3)
+        ];
+        geometry = new THREE.LatheGeometry(mushroomPoints, 32);
+        name = `Mushroom_${objectCounter}`;
+        break;
+      }
+      case 'leaf': {
+        // Leaf shape
+        const leafShape = new THREE.Shape();
+        leafShape.moveTo(0, -0.5);
+        leafShape.quadraticCurveTo(0.4, -0.2, 0.3, 0.2);
+        leafShape.quadraticCurveTo(0.15, 0.4, 0, 0.5);
+        leafShape.quadraticCurveTo(-0.15, 0.4, -0.3, 0.2);
+        leafShape.quadraticCurveTo(-0.4, -0.2, 0, -0.5);
+        geometry = new THREE.ExtrudeGeometry(leafShape, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02 });
+        name = `Leaf_${objectCounter}`;
+        break;
+      }
+      case 'drop': {
+        // Water drop / teardrop shape
+        const dropPoints = [];
+        for (let i = 0; i <= 20; i++) {
+          const t = i / 20;
+          const y = t * 1 - 0.5;
+          const r = Math.sin(t * Math.PI) * 0.35 * Math.sqrt(t);
+          dropPoints.push(new THREE.Vector2(r, y));
+        }
+        geometry = new THREE.LatheGeometry(dropPoints, 32);
+        name = `Drop_${objectCounter}`;
+        break;
+      }
+      case 'knot': {
+        // Different torus knot
+        geometry = new THREE.TorusKnotGeometry(0.35, 0.1, 100, 16, 3, 2);
+        name = `Knot_${objectCounter}`;
+        break;
+      }
+      case 'helix': {
+        // DNA-like double helix
+        const helixPoints1 = [];
+        const turns = 2;
+        for (let i = 0; i <= turns * 40; i++) {
+          const t = i / 40;
+          const angle = t * Math.PI * 2;
+          helixPoints1.push(new THREE.Vector3(
+            Math.cos(angle) * 0.3,
+            t * 0.4 - (turns * 0.4) / 2,
+            Math.sin(angle) * 0.3
+          ));
+        }
+        const helixPath = new THREE.CatmullRomCurve3(helixPoints1);
+        geometry = new THREE.TubeGeometry(helixPath, turns * 40, 0.06, 8, false);
+        name = `Helix_${objectCounter}`;
+        break;
+      }
+      case 'mobius': {
+        // Möbius strip approximation
+        const mobiusPoints = [];
+        const mobiusSegments = 100;
+        for (let i = 0; i <= mobiusSegments; i++) {
+          const t = (i / mobiusSegments) * Math.PI * 2;
+          mobiusPoints.push(new THREE.Vector3(
+            (1 + 0.3 * Math.cos(t / 2)) * Math.cos(t) * 0.4,
+            0.3 * Math.sin(t / 2) * 0.4,
+            (1 + 0.3 * Math.cos(t / 2)) * Math.sin(t) * 0.4
+          ));
+        }
+        const mobiusPath = new THREE.CatmullRomCurve3(mobiusPoints);
+        geometry = new THREE.TubeGeometry(mobiusPath, 100, 0.05, 8, true);
+        name = `Mobius_${objectCounter}`;
+        break;
+      }
+      // === NEW SHAPES ===
+      case 'ellipsoid': {
+        // Ellipsoid (stretched sphere)
+        geometry = new THREE.SphereGeometry(0.5, 32, 32);
+        // Scale will be applied to mesh
+        name = `Ellipsoid_${objectCounter}`;
+        break;
+      }
+      case 'roundedcube': {
+        // Rounded cube using RoundedBoxGeometry approximation
+        const rcSize = 0.8;
+        const rcRadius = 0.1;
+        const rcSegments = 4;
+        geometry = new THREE.BoxGeometry(rcSize, rcSize, rcSize, rcSegments, rcSegments, rcSegments);
+        // Modify vertices to round edges
+        const posAttr = geometry.attributes.position;
+        const v = new THREE.Vector3();
+        for (let i = 0; i < posAttr.count; i++) {
+          v.fromBufferAttribute(posAttr, i);
+          v.normalize().multiplyScalar(rcSize * 0.6);
+          posAttr.setXYZ(i, v.x, v.y, v.z);
+        }
+        geometry.computeVertexNormals();
+        name = `RoundedCube_${objectCounter}`;
+        break;
+      }
+      case 'squarepyramid': {
+        // Square pyramid
+        geometry = new THREE.ConeGeometry(0.5, 1, 4);
+        name = `SquarePyramid_${objectCounter}`;
+        break;
+      }
+      case 'pentagonpyramid': {
+        // Pentagon pyramid
+        geometry = new THREE.ConeGeometry(0.5, 1, 5);
+        name = `PentagonPyramid_${objectCounter}`;
+        break;
+      }
+      case 'hexagonpyramid': {
+        // Hexagon pyramid
+        geometry = new THREE.ConeGeometry(0.5, 1, 6);
+        name = `HexagonPyramid_${objectCounter}`;
+        break;
+      }
+      case 'pentagonprism': {
+        // Pentagon prism
+        geometry = new THREE.CylinderGeometry(0.5, 0.5, 1, 5);
+        name = `PentagonPrism_${objectCounter}`;
+        break;
+      }
+      case 'decagonprism': {
+        // Decagon prism (10-sided)
+        geometry = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
+        name = `DecagonPrism_${objectCounter}`;
+        break;
+      }
+      case 'truncatedcone': {
+        // Truncated cone (frustum)
+        geometry = new THREE.CylinderGeometry(0.3, 0.5, 1, 32);
+        name = `TruncatedCone_${objectCounter}`;
+        break;
+      }
+      case 'cuboctahedron': {
+        // Cuboctahedron (Archimedean solid)
+        geometry = new THREE.IcosahedronGeometry(0.5, 0);
+        name = `Cuboctahedron_${objectCounter}`;
+        break;
+      }
+      case 'truncatedtetrahedron': {
+        // Truncated tetrahedron
+        geometry = new THREE.TetrahedronGeometry(0.6, 1);
+        name = `TruncatedTetra_${objectCounter}`;
+        break;
+      }
+      case 'truncatedicosahedron': {
+        // Soccer ball shape (truncated icosahedron)
+        geometry = new THREE.IcosahedronGeometry(0.5, 1);
+        name = `SoccerBall_${objectCounter}`;
+        break;
+      }
+      case 'stellatedoctahedron': {
+        // Stellated octahedron (star shape)
+        geometry = new THREE.OctahedronGeometry(0.5, 0);
+        name = `StellatedOcta_${objectCounter}`;
+        break;
+      }
+      case 'parametricwave': {
+        // Parametric wave surface
+        const waveFunc = (u, v, target) => {
+          const x = (u - 0.5) * 2;
+          const z = (v - 0.5) * 2;
+          const y = Math.sin(x * Math.PI * 2) * Math.cos(z * Math.PI * 2) * 0.2;
+          target.set(x * 0.5, y, z * 0.5);
+        };
+        geometry = createParametricGeometry(waveFunc, 32, 32);
+        name = `WaveSurface_${objectCounter}`;
+        break;
+      }
+      case 'parametricspiral': {
+        // Parametric spiral surface
+        const spiralFunc = (u, v, target) => {
+          const angle = u * Math.PI * 4;
+          const radius = 0.2 + v * 0.3;
+          const x = Math.cos(angle) * radius;
+          const z = Math.sin(angle) * radius;
+          const y = u - 0.5;
+          target.set(x, y, z);
+        };
+        geometry = createParametricGeometry(spiralFunc, 64, 8);
+        name = `SpiralSurface_${objectCounter}`;
+        break;
+      }
+      case 'parametricsaddle': {
+        // Saddle surface (hyperbolic paraboloid)
+        const saddleFunc = (u, v, target) => {
+          const x = (u - 0.5) * 2;
+          const z = (v - 0.5) * 2;
+          const y = x * x - z * z;
+          target.set(x * 0.4, y * 0.2, z * 0.4);
+        };
+        geometry = createParametricGeometry(saddleFunc, 32, 32);
+        name = `SaddleSurface_${objectCounter}`;
+        break;
+      }
+      case 'klein': {
+        // Klein bottle approximation
+        const kleinFunc = (u, v, target) => {
+          u *= Math.PI * 2;
+          v *= Math.PI * 2;
+          const r = 4 * (1 - Math.cos(u) / 2);
+          let x, y, z;
+          if (u < Math.PI) {
+            x = 6 * Math.cos(u) * (1 + Math.sin(u)) + r * Math.cos(u) * Math.cos(v);
+            y = 16 * Math.sin(u) + r * Math.sin(u) * Math.cos(v);
+          } else {
+            x = 6 * Math.cos(u) * (1 + Math.sin(u)) + r * Math.cos(v + Math.PI);
+            y = 16 * Math.sin(u);
+          }
+          z = r * Math.sin(v);
+          target.set(x * 0.03, y * 0.03 - 0.3, z * 0.03);
+        };
+        geometry = createParametricGeometry(kleinFunc, 64, 32);
+        name = `KleinBottle_${objectCounter}`;
+        break;
+      }
+      case 'sweepstar': {
+        // Star shape swept along a path
+        const starPath = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0, -0.5, 0),
+          new THREE.Vector3(0.2, -0.25, 0.2),
+          new THREE.Vector3(0, 0, 0),
+          new THREE.Vector3(-0.2, 0.25, -0.2),
+          new THREE.Vector3(0, 0.5, 0)
+        ]);
+        geometry = new THREE.TubeGeometry(starPath, 64, 0.15, 5, false);
+        name = `SweepStar_${objectCounter}`;
+        break;
+      }
+      case 'sweepcircle': {
+        // Circle swept along curved path
+        const circlePath = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(-0.5, 0, 0),
+          new THREE.Vector3(0, 0.3, 0.3),
+          new THREE.Vector3(0.5, 0, 0)
+        ]);
+        geometry = new THREE.TubeGeometry(circlePath, 64, 0.12, 16, false);
+        name = `SweepCircle_${objectCounter}`;
+        break;
+      }
+      case 'lathestar': {
+        // Star profile lathed
+        const latheStarPoints = [];
+        for (let i = 0; i <= 10; i++) {
+          const angle = (i / 10) * Math.PI;
+          const r = i % 2 === 0 ? 0.4 : 0.2;
+          latheStarPoints.push(new THREE.Vector2(Math.sin(angle) * r, Math.cos(angle) * 0.5));
+        }
+        geometry = new THREE.LatheGeometry(latheStarPoints, 32);
+        name = `LatheStar_${objectCounter}`;
+        break;
+      }
+      case 'latheheart': {
+        // Heart profile lathed
+        const latheHeartPoints = [
+          new THREE.Vector2(0, -0.5),
+          new THREE.Vector2(0.3, -0.2),
+          new THREE.Vector2(0.35, 0.1),
+          new THREE.Vector2(0.25, 0.3),
+          new THREE.Vector2(0, 0.5)
+        ];
+        geometry = new THREE.LatheGeometry(latheHeartPoints, 32);
+        name = `LatheHeart_${objectCounter}`;
+        break;
+      }
+      case 'trefoil': {
+        // Trefoil knot
+        const trefoilPoints = [];
+        for (let i = 0; i <= 200; i++) {
+          const t = (i / 200) * Math.PI * 2;
+          trefoilPoints.push(new THREE.Vector3(
+            Math.sin(t) + 2 * Math.sin(2 * t),
+            Math.cos(t) - 2 * Math.cos(2 * t),
+            -Math.sin(3 * t)
+          ).multiplyScalar(0.12));
+        }
+        const trefoilPath = new THREE.CatmullRomCurve3(trefoilPoints);
+        geometry = new THREE.TubeGeometry(trefoilPath, 200, 0.04, 8, true);
+        name = `Trefoil_${objectCounter}`;
+        break;
+      }
+      case 'cinquefoil': {
+        // Cinquefoil knot (5-lobed)
+        const cinquefoilPoints = [];
+        for (let i = 0; i <= 200; i++) {
+          const t = (i / 200) * Math.PI * 2;
+          const r = 0.4 + 0.1 * Math.cos(5 * t);
+          cinquefoilPoints.push(new THREE.Vector3(
+            r * Math.cos(t),
+            0.2 * Math.sin(3 * t),
+            r * Math.sin(t)
+          ));
+        }
+        const cinquefoilPath = new THREE.CatmullRomCurve3(cinquefoilPoints);
+        geometry = new THREE.TubeGeometry(cinquefoilPath, 200, 0.03, 8, true);
+        name = `Cinquefoil_${objectCounter}`;
+        break;
+      }
+      case 'shell': {
+        // Nautilus shell
+        const shellPoints = [];
+        for (let i = 0; i <= 300; i++) {
+          const t = (i / 300) * Math.PI * 6;
+          const r = 0.05 * Math.exp(0.1 * t);
+          shellPoints.push(new THREE.Vector3(
+            r * Math.cos(t),
+            t * 0.02 - 0.3,
+            r * Math.sin(t)
+          ));
+        }
+        const shellPath = new THREE.CatmullRomCurve3(shellPoints);
+        geometry = new THREE.TubeGeometry(shellPath, 300, 0.02 + 0.001, 8, false);
+        name = `Shell_${objectCounter}`;
+        break;
+      }
+      case 'horn': {
+        // Horn shape
+        const hornPoints = [];
+        for (let i = 0; i <= 50; i++) {
+          const t = i / 50;
+          const r = 0.3 * (1 - t * 0.8);
+          hornPoints.push(new THREE.Vector2(r, t - 0.5));
+        }
+        geometry = new THREE.LatheGeometry(hornPoints, 32);
+        name = `Horn_${objectCounter}`;
+        break;
+      }
+      case 'bottle': {
+        // Bottle shape
+        const bottlePoints = [
+          new THREE.Vector2(0.2, -0.5),
+          new THREE.Vector2(0.25, -0.4),
+          new THREE.Vector2(0.25, 0),
+          new THREE.Vector2(0.15, 0.1),
+          new THREE.Vector2(0.1, 0.2),
+          new THREE.Vector2(0.1, 0.4),
+          new THREE.Vector2(0.12, 0.45),
+          new THREE.Vector2(0.12, 0.5)
+        ];
+        geometry = new THREE.LatheGeometry(bottlePoints, 32);
+        name = `Bottle_${objectCounter}`;
+        break;
+      }
+      case 'funnel': {
+        // Funnel shape
+        const funnelPoints = [
+          new THREE.Vector2(0.05, -0.5),
+          new THREE.Vector2(0.05, -0.2),
+          new THREE.Vector2(0.1, -0.1),
+          new THREE.Vector2(0.4, 0.3),
+          new THREE.Vector2(0.45, 0.5)
+        ];
+        geometry = new THREE.LatheGeometry(funnelPoints, 32);
+        name = `Funnel_${objectCounter}`;
+        break;
+      }
+      case 'bell': {
+        // Bell shape
+        const bellPoints = [
+          new THREE.Vector2(0.05, -0.5),
+          new THREE.Vector2(0.45, -0.4),
+          new THREE.Vector2(0.4, -0.2),
+          new THREE.Vector2(0.3, 0),
+          new THREE.Vector2(0.15, 0.2),
+          new THREE.Vector2(0.08, 0.4),
+          new THREE.Vector2(0.1, 0.5)
+        ];
+        geometry = new THREE.LatheGeometry(bellPoints, 32);
+        name = `Bell_${objectCounter}`;
+        break;
+      }
+      case 'hourglass': {
+        // Hourglass shape
+        const hourglassPoints = [
+          new THREE.Vector2(0.35, -0.5),
+          new THREE.Vector2(0.3, -0.3),
+          new THREE.Vector2(0.08, 0),
+          new THREE.Vector2(0.3, 0.3),
+          new THREE.Vector2(0.35, 0.5)
+        ];
+        geometry = new THREE.LatheGeometry(hourglassPoints, 32);
+        name = `Hourglass_${objectCounter}`;
+        break;
+      }
+      case 'pillar': {
+        // Classical pillar
+        const pillarPoints = [
+          new THREE.Vector2(0.35, -0.5),
+          new THREE.Vector2(0.35, -0.45),
+          new THREE.Vector2(0.25, -0.4),
+          new THREE.Vector2(0.22, 0.35),
+          new THREE.Vector2(0.25, 0.4),
+          new THREE.Vector2(0.35, 0.45),
+          new THREE.Vector2(0.35, 0.5)
+        ];
+        geometry = new THREE.LatheGeometry(pillarPoints, 16);
+        name = `Pillar_${objectCounter}`;
+        break;
+      }
+      case 'ufo': {
+        // UFO/flying saucer shape
+        const ufoPoints = [
+          new THREE.Vector2(0.05, -0.2),
+          new THREE.Vector2(0.15, -0.15),
+          new THREE.Vector2(0.5, 0),
+          new THREE.Vector2(0.15, 0.1),
+          new THREE.Vector2(0.1, 0.2),
+          new THREE.Vector2(0.05, 0.25)
+        ];
+        geometry = new THREE.LatheGeometry(ufoPoints, 32);
+        name = `UFO_${objectCounter}`;
+        break;
+      }
+      case 'lens': {
+        // Lens / lenticular shape
+        const lensPoints = [];
+        for (let i = 0; i <= 20; i++) {
+          const t = i / 20;
+          const angle = t * Math.PI;
+          lensPoints.push(new THREE.Vector2(
+            Math.sin(angle) * 0.5,
+            Math.cos(angle) * 0.15
+          ));
+        }
+        geometry = new THREE.LatheGeometry(lensPoints, 32);
+        name = `Lens_${objectCounter}`;
+        break;
+      }
+      case 'barrel': {
+        // Barrel shape
+        const barrelPoints = [
+          new THREE.Vector2(0.3, -0.5),
+          new THREE.Vector2(0.35, -0.3),
+          new THREE.Vector2(0.4, 0),
+          new THREE.Vector2(0.35, 0.3),
+          new THREE.Vector2(0.3, 0.5)
+        ];
+        geometry = new THREE.LatheGeometry(barrelPoints, 32);
+        name = `Barrel_${objectCounter}`;
+        break;
+      }
+      case 'spike': {
+        // Spike/thorn
+        geometry = new THREE.ConeGeometry(0.15, 1, 8);
+        name = `Spike_${objectCounter}`;
+        break;
+      }
+      case 'wedge': {
+        // Wedge shape
+        const wedgeShape = new THREE.Shape();
+        wedgeShape.moveTo(0, 0);
+        wedgeShape.lineTo(1, 0);
+        wedgeShape.lineTo(0, 0.5);
+        wedgeShape.lineTo(0, 0);
+        geometry = new THREE.ExtrudeGeometry(wedgeShape, { depth: 0.5, bevelEnabled: false });
+        geometry.translate(-0.5, -0.25, -0.25);
+        geometry.scale(0.8, 0.8, 0.8);
+        name = `Wedge_${objectCounter}`;
+        break;
+      }
+      case 'ramp': {
+        // Ramp shape
+        const rampShape = new THREE.Shape();
+        rampShape.moveTo(0, 0);
+        rampShape.lineTo(1, 0);
+        rampShape.lineTo(1, 0.3);
+        rampShape.lineTo(0, 0);
+        geometry = new THREE.ExtrudeGeometry(rampShape, { depth: 0.6, bevelEnabled: false });
+        geometry.translate(-0.5, -0.15, -0.3);
+        name = `Ramp_${objectCounter}`;
+        break;
+      }
+      case 'arch': {
+        // Arch shape
+        const archShape = new THREE.Shape();
+        archShape.moveTo(-0.4, -0.3);
+        archShape.lineTo(-0.4, 0.2);
+        archShape.quadraticCurveTo(-0.4, 0.5, 0, 0.5);
+        archShape.quadraticCurveTo(0.4, 0.5, 0.4, 0.2);
+        archShape.lineTo(0.4, -0.3);
+        archShape.lineTo(0.25, -0.3);
+        archShape.lineTo(0.25, 0.15);
+        archShape.quadraticCurveTo(0.25, 0.35, 0, 0.35);
+        archShape.quadraticCurveTo(-0.25, 0.35, -0.25, 0.15);
+        archShape.lineTo(-0.25, -0.3);
+        archShape.lineTo(-0.4, -0.3);
+        geometry = new THREE.ExtrudeGeometry(archShape, { depth: 0.3, bevelEnabled: false });
+        geometry.translate(0, 0, -0.15);
+        name = `Arch_${objectCounter}`;
+        break;
+      }
+      case 'lshape': {
+        // L-shape
+        const lShape = new THREE.Shape();
+        lShape.moveTo(0, 0);
+        lShape.lineTo(0.5, 0);
+        lShape.lineTo(0.5, 0.2);
+        lShape.lineTo(0.2, 0.2);
+        lShape.lineTo(0.2, 0.5);
+        lShape.lineTo(0, 0.5);
+        lShape.lineTo(0, 0);
+        geometry = new THREE.ExtrudeGeometry(lShape, { depth: 0.2, bevelEnabled: false });
+        geometry.translate(-0.25, -0.25, -0.1);
+        name = `LShape_${objectCounter}`;
+        break;
+      }
+      case 'tshape': {
+        // T-shape
+        const tShape = new THREE.Shape();
+        tShape.moveTo(-0.3, 0.25);
+        tShape.lineTo(0.3, 0.25);
+        tShape.lineTo(0.3, 0.1);
+        tShape.lineTo(0.1, 0.1);
+        tShape.lineTo(0.1, -0.25);
+        tShape.lineTo(-0.1, -0.25);
+        tShape.lineTo(-0.1, 0.1);
+        tShape.lineTo(-0.3, 0.1);
+        tShape.lineTo(-0.3, 0.25);
+        geometry = new THREE.ExtrudeGeometry(tShape, { depth: 0.2, bevelEnabled: false });
+        geometry.translate(0, 0, -0.1);
+        name = `TShape_${objectCounter}`;
+        break;
+      }
+      case 'hshape': {
+        // H-shape / I-beam
+        const hShape = new THREE.Shape();
+        hShape.moveTo(-0.25, -0.3);
+        hShape.lineTo(-0.25, 0.3);
+        hShape.lineTo(-0.1, 0.3);
+        hShape.lineTo(-0.1, 0.05);
+        hShape.lineTo(0.1, 0.05);
+        hShape.lineTo(0.1, 0.3);
+        hShape.lineTo(0.25, 0.3);
+        hShape.lineTo(0.25, -0.3);
+        hShape.lineTo(0.1, -0.3);
+        hShape.lineTo(0.1, -0.05);
+        hShape.lineTo(-0.1, -0.05);
+        hShape.lineTo(-0.1, -0.3);
+        hShape.lineTo(-0.25, -0.3);
+        geometry = new THREE.ExtrudeGeometry(hShape, { depth: 0.2, bevelEnabled: false });
+        geometry.translate(0, 0, -0.1);
+        name = `HShape_${objectCounter}`;
         break;
       }
       default:
@@ -1385,7 +2131,9 @@ const ThreeDEditor = () => {
         { type: 'cylinder', icon: Cylinder, label: 'Cylinder' },
         { type: 'cone', icon: Triangle, label: 'Cone' },
         { type: 'torus', icon: Donut, label: 'Torus' },
-        { type: 'plane', icon: Square, label: 'Plane' }
+        { type: 'plane', icon: Square, label: 'Plane' },
+        { type: 'roundedcube', icon: Box, label: 'Rounded Cube' },
+        { type: 'ellipsoid', icon: Circle, label: 'Ellipsoid' }
       ]
     },
     {
@@ -1394,34 +2142,138 @@ const ThreeDEditor = () => {
         { type: 'tetrahedron', icon: Triangle, label: 'Tetrahedron' },
         { type: 'octahedron', icon: Diamond, label: 'Octahedron' },
         { type: 'dodecahedron', icon: Pentagon, label: 'Dodecahedron' },
-        { type: 'icosahedron', icon: Hexagon, label: 'Icosahedron' }
+        { type: 'icosahedron', icon: Hexagon, label: 'Icosahedron' },
+        { type: 'crystal', icon: Gem, label: 'Crystal' }
       ]
     },
     {
-      name: 'Advanced',
+      name: 'Archimedean',
+      shapes: [
+        { type: 'cuboctahedron', icon: Hexagon, label: 'Cuboctahedron' },
+        { type: 'truncatedtetrahedron', icon: Triangle, label: 'Trunc. Tetra' },
+        { type: 'truncatedicosahedron', icon: Circle, label: 'Soccer Ball' },
+        { type: 'stellatedoctahedron', icon: Star, label: 'Stellated' }
+      ]
+    },
+    {
+      name: 'Pyramids',
+      shapes: [
+        { type: 'pyramid', icon: Triangle, label: 'Tri Pyramid' },
+        { type: 'squarepyramid', icon: Triangle, label: 'Square Pyramid' },
+        { type: 'pentagonpyramid', icon: Pentagon, label: 'Penta Pyramid' },
+        { type: 'hexagonpyramid', icon: Hexagon, label: 'Hex Pyramid' }
+      ]
+    },
+    {
+      name: 'Prisms',
+      shapes: [
+        { type: 'prism', icon: Triangle, label: 'Tri Prism' },
+        { type: 'pentagonprism', icon: Pentagon, label: 'Penta Prism' },
+        { type: 'hexagonprism', icon: Hexagon, label: 'Hex Prism' },
+        { type: 'octagonprism', icon: CircleDot, label: 'Oct Prism' },
+        { type: 'decagonprism', icon: Circle, label: 'Deca Prism' },
+        { type: 'truncatedcone', icon: Triangle, label: 'Frustum' }
+      ]
+    },
+    {
+      name: 'Round Shapes',
       shapes: [
         { type: 'torusknot', icon: Star, label: 'Torus Knot' },
         { type: 'ring', icon: CircleDot, label: 'Ring' },
         { type: 'capsule', icon: Pill, label: 'Capsule' },
-        { type: 'hemisphere', icon: Circle, label: 'Hemisphere' }
+        { type: 'hemisphere', icon: Circle, label: 'Hemisphere' },
+        { type: 'egg', icon: Circle, label: 'Egg' },
+        { type: 'drop', icon: Circle, label: 'Drop' },
+        { type: 'lens', icon: Circle, label: 'Lens' },
+        { type: 'barrel', icon: Box, label: 'Barrel' }
       ]
     },
     {
-      name: 'Geometric',
+      name: 'Containers',
       shapes: [
-        { type: 'pyramid', icon: Triangle, label: 'Pyramid' },
-        { type: 'prism', icon: Triangle, label: 'Prism' },
-        { type: 'gear', icon: Settings, label: 'Gear' },
-        { type: 'star3d', icon: Star, label: '3D Star' }
+        { type: 'vase', icon: Box, label: 'Vase' },
+        { type: 'bowl', icon: Circle, label: 'Bowl' },
+        { type: 'goblet', icon: Box, label: 'Goblet' },
+        { type: 'bottle', icon: Box, label: 'Bottle' },
+        { type: 'funnel', icon: Triangle, label: 'Funnel' },
+        { type: 'bell', icon: Box, label: 'Bell' }
       ]
     },
     {
-      name: 'Special',
+      name: 'Symbols',
       shapes: [
         { type: 'heart', icon: Heart, label: 'Heart' },
+        { type: 'star3d', icon: Star, label: '3D Star' },
+        { type: 'cross', icon: Plus, label: 'Cross' },
+        { type: 'moon', icon: Circle, label: 'Moon' },
+        { type: 'lightning', icon: Zap, label: 'Lightning' },
+        { type: 'diamond', icon: Diamond, label: 'Diamond' }
+      ]
+    },
+    {
+      name: 'Nature',
+      shapes: [
+        { type: 'mushroom', icon: Circle, label: 'Mushroom' },
+        { type: 'leaf', icon: Heart, label: 'Leaf' },
+        { type: 'shell', icon: Waves, label: 'Shell' },
+        { type: 'horn', icon: Triangle, label: 'Horn' }
+      ]
+    },
+    {
+      name: 'Mechanical',
+      shapes: [
+        { type: 'gear', icon: Settings, label: 'Gear' },
         { type: 'arrow', icon: Triangle, label: 'Arrow' },
         { type: 'tube', icon: Waves, label: 'Tube' },
-        { type: 'spring', icon: Waves, label: 'Spring' }
+        { type: 'spring', icon: Waves, label: 'Spring' },
+        { type: 'spike', icon: Triangle, label: 'Spike' }
+      ]
+    },
+    {
+      name: 'Architecture',
+      shapes: [
+        { type: 'arch', icon: Box, label: 'Arch' },
+        { type: 'pillar', icon: Box, label: 'Pillar' },
+        { type: 'wedge', icon: Triangle, label: 'Wedge' },
+        { type: 'ramp', icon: Triangle, label: 'Ramp' },
+        { type: 'hourglass', icon: Box, label: 'Hourglass' },
+        { type: 'ufo', icon: Circle, label: 'UFO' }
+      ]
+    },
+    {
+      name: 'Structural',
+      shapes: [
+        { type: 'lshape', icon: Box, label: 'L-Shape' },
+        { type: 'tshape', icon: Box, label: 'T-Shape' },
+        { type: 'hshape', icon: Box, label: 'H-Shape' }
+      ]
+    },
+    {
+      name: 'Mathematical',
+      shapes: [
+        { type: 'knot', icon: Star, label: 'Knot' },
+        { type: 'helix', icon: Waves, label: 'Helix' },
+        { type: 'mobius', icon: CircleDot, label: 'Möbius' },
+        { type: 'trefoil', icon: Star, label: 'Trefoil' },
+        { type: 'cinquefoil', icon: Star, label: 'Cinquefoil' },
+        { type: 'klein', icon: CircleDot, label: 'Klein Bottle' }
+      ]
+    },
+    {
+      name: 'Parametric',
+      shapes: [
+        { type: 'parametricwave', icon: Waves, label: 'Wave Surface' },
+        { type: 'parametricspiral', icon: Waves, label: 'Spiral Surface' },
+        { type: 'parametricsaddle', icon: Box, label: 'Saddle' }
+      ]
+    },
+    {
+      name: 'Sweep/Lathe',
+      shapes: [
+        { type: 'sweepstar', icon: Star, label: 'Sweep Star' },
+        { type: 'sweepcircle', icon: Circle, label: 'Sweep Circle' },
+        { type: 'lathestar', icon: Star, label: 'Lathe Star' },
+        { type: 'latheheart', icon: Heart, label: 'Lathe Heart' }
       ]
     }
   ];
@@ -1484,7 +2336,7 @@ const ThreeDEditor = () => {
                     <Shapes className="w-4 h-4 text-blue-400" />
                     All Shapes
                   </span>
-                  <span className="text-xs text-gray-500">22 shapes</span>
+                  <span className="text-xs text-gray-500">75+ shapes</span>
                 </div>
                 
                 {shapeCategories.map((category) => (
