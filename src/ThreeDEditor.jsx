@@ -163,7 +163,7 @@ const COLOR_PRESETS = [
 // MAIN 3D EDITOR COMPONENT
 // ============================================================================
 
-const ThreeDEditor = () => {
+const ThreeDEditor = ({ onBackToHome }) => {
   // -------------------------------------------------------------------------
   // REFS - Three.js objects that persist across renders
   // -------------------------------------------------------------------------
@@ -205,6 +205,8 @@ const ThreeDEditor = () => {
   const [showLightingPanel, setShowLightingPanel] = useState(false); // Lighting panel visibility
   const [lightCounter, setLightCounter] = useState(0);  // Light naming counter
   const [showShapesPanel, setShowShapesPanel] = useState(false); // Shapes dropdown panel
+  const [showLeftPanel, setShowLeftPanel] = useState(true); // Left sidebar visibility
+  const [showRightPanel, setShowRightPanel] = useState(true); // Right sidebar visibility
 
   // -------------------------------------------------------------------------
   // HELPER: Generate unique object ID
@@ -2282,29 +2284,44 @@ const ThreeDEditor = () => {
   // RENDER
   // -------------------------------------------------------------------------
   return (
-    <div className="flex flex-col h-screen bg-gray-900 text-white">
+    <div className="flex flex-col h-screen bg-gray-900 text-white overflow-hidden">
       {/* TOP TOOLBAR */}
-      <div className="h-12 bg-gray-800 border-b border-gray-700 flex items-center px-4 gap-2">
+      <div className="h-12 sm:h-14 bg-gray-800 border-b border-gray-700 flex items-center px-2 sm:px-4 gap-1 sm:gap-2 overflow-x-auto">
         {/* Logo/Title */}
-        <div className="flex items-center gap-2 mr-4">
-          <Grid3X3 className="w-5 h-5 text-blue-400" />
-          <span className="font-semibold text-lg">3D Editor</span>
+        <div className="flex items-center gap-1.5 sm:gap-2 mr-2 sm:mr-4 flex-shrink-0">
+          <Grid3X3 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+          <span className="font-semibold text-base sm:text-lg whitespace-nowrap">3D Editor</span>
         </div>
 
+        {/* Home Button */}
+        {onBackToHome && (
+          <>
+            <button
+              onClick={onBackToHome}
+              className="px-2 sm:px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded transition-colors flex items-center gap-1.5 text-xs sm:text-sm flex-shrink-0"
+              title="Back to Home"
+            >
+              <Home className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Home</span>
+            </button>
+            <div className="w-px h-4 sm:h-6 bg-gray-600 flex-shrink-0" />
+          </>
+        )}
+
         {/* Divider */}
-        <div className="w-px h-6 bg-gray-600" />
+        <div className="w-px h-4 sm:h-6 bg-gray-600 flex-shrink-0 hidden sm:block" />
 
         {/* Add Primitives - Basic shapes shown directly */}
-        <div className="flex items-center gap-1 ml-2">
-          {basicPrimitives.map(({ type, icon: Icon, label }) => (
+        <div className="flex items-center gap-0.5 sm:gap-1 ml-1 sm:ml-2 flex-shrink-0">
+          {basicPrimitives.slice(0, 4).map(({ type, icon: Icon, label }) => (
             <button
               key={type}
               onClick={() => addPrimitive(type)}
-              className="p-2 hover:bg-gray-700 rounded transition-colors group relative"
+              className="p-1.5 sm:p-2 hover:bg-gray-700 rounded transition-colors group relative"
               title={`Add ${label}`}
             >
-              <Icon className="w-5 h-5" />
-              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-gray-900 px-2 py-1 text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+              <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="hidden lg:block absolute -bottom-8 left-1/2 -translate-x-1/2 bg-gray-900 px-2 py-1 text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
                 {label}
               </span>
             </button>
@@ -2711,11 +2728,11 @@ const ThreeDEditor = () => {
 
       {/* MAIN CONTENT AREA */}
       <div className="flex flex-1 overflow-hidden">
-        {/* LEFT SIDEBAR - Object List */}
-        <div className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
-          <div className="p-3 border-b border-gray-700 flex items-center gap-2">
+        {/* LEFT SIDEBAR - Object List - Hidden on mobile, toggle button */}
+        <div className={`${showLeftPanel ? 'w-64' : 'w-0'} md:w-64 bg-gray-800 border-r border-gray-700 flex flex-col transition-all duration-300 overflow-hidden`}>
+          <div className="p-3 border-b border-gray-700 flex items-center gap-2 flex-shrink-0">
             <Layers className="w-4 h-4 text-gray-400" />
-            <span className="font-medium">Scene Objects</span>
+            <span className="font-medium text-sm sm:text-base">Scene Objects</span>
             <span className="ml-auto text-xs text-gray-500">{objects.length}</span>
           </div>
           
@@ -2784,30 +2801,48 @@ const ThreeDEditor = () => {
           className="flex-1 relative cursor-crosshair"
           onClick={handleViewportClick}
         >
-          {/* Keyboard shortcuts hint */}
-          <div className="absolute bottom-4 left-4 bg-gray-900 bg-opacity-80 rounded px-3 py-2 text-xs text-gray-400">
-            <div className="flex gap-4">
-              <span><kbd className="bg-gray-700 px-1.5 py-0.5 rounded">T</kbd> Translate</span>
-              <span><kbd className="bg-gray-700 px-1.5 py-0.5 rounded">R</kbd> Rotate</span>
-              <span><kbd className="bg-gray-700 px-1.5 py-0.5 rounded">S</kbd> Scale</span>
-              <span><kbd className="bg-gray-700 px-1.5 py-0.5 rounded">Del</kbd> Delete</span>
-              <span><kbd className="bg-gray-700 px-1.5 py-0.5 rounded">Ctrl+D</kbd> Duplicate</span>
-              <span><kbd className="bg-gray-700 px-1.5 py-0.5 rounded">Ctrl+Z</kbd> Undo</span>
+          {/* Mobile Panel Toggle Buttons */}
+          <div className="md:hidden absolute top-4 left-4 z-10 flex gap-2">
+            <button
+              onClick={() => setShowLeftPanel(!showLeftPanel)}
+              className="bg-gray-800/90 backdrop-blur-sm p-2.5 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors shadow-lg"
+              title="Toggle Objects Panel"
+            >
+              <Layers className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setShowRightPanel(!showRightPanel)}
+              className="bg-gray-800/90 backdrop-blur-sm p-2.5 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors shadow-lg"
+              title="Toggle Properties Panel"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+          </div>
+          
+          {/* Keyboard shortcuts hint - Hidden on mobile */}
+          <div className="hidden sm:block absolute bottom-4 left-4 bg-gray-900 bg-opacity-80 rounded px-3 py-2 text-xs text-gray-400">
+            <div className="flex gap-2 lg:gap-4 flex-wrap">
+              <span className="whitespace-nowrap"><kbd className="bg-gray-700 px-1.5 py-0.5 rounded">T</kbd> Translate</span>
+              <span className="whitespace-nowrap"><kbd className="bg-gray-700 px-1.5 py-0.5 rounded">R</kbd> Rotate</span>
+              <span className="whitespace-nowrap"><kbd className="bg-gray-700 px-1.5 py-0.5 rounded">S</kbd> Scale</span>
+              <span className="whitespace-nowrap"><kbd className="bg-gray-700 px-1.5 py-0.5 rounded">Del</kbd> Delete</span>
+              <span className="hidden lg:inline whitespace-nowrap"><kbd className="bg-gray-700 px-1.5 py-0.5 rounded">Ctrl+D</kbd> Duplicate</span>
+              <span className="hidden lg:inline whitespace-nowrap"><kbd className="bg-gray-700 px-1.5 py-0.5 rounded">Ctrl+Z</kbd> Undo</span>
             </div>
           </div>
 
           {/* Transform mode indicator */}
-          <div className="absolute top-4 left-4 bg-gray-900 bg-opacity-80 rounded px-3 py-2 text-sm">
+          <div className="hidden sm:block absolute top-4 left-4 bg-gray-900 bg-opacity-80 rounded px-3 py-2 text-sm">
             <span className="text-gray-400">Mode: </span>
             <span className="text-blue-400 capitalize">{transformMode}</span>
           </div>
         </div>
 
-        {/* RIGHT SIDEBAR - Properties Panel */}
-        <div className="w-80 bg-gray-800 border-l border-gray-700 flex flex-col">
-          <div className="p-3 border-b border-gray-700 flex items-center gap-2">
+        {/* RIGHT SIDEBAR - Properties Panel - Responsive */}
+        <div className={`${showRightPanel ? 'w-80' : 'w-0'} md:w-80 bg-gray-800 border-l border-gray-700 flex flex-col transition-all duration-300 overflow-hidden`}>
+          <div className="p-3 border-b border-gray-700 flex items-center gap-2 flex-shrink-0">
             <Settings className="w-4 h-4 text-gray-400" />
-            <span className="font-medium">Properties</span>
+            <span className="font-medium text-sm sm:text-base">Properties</span>
           </div>
 
           {selectedObject ? (
